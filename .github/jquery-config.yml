@@ -7,7 +7,7 @@ queries:
 
 paths:
   # Path to your jQuery file - replace with actual path
-  - path/to/your/jquery/file.js
+  - jquery.js
 
 paths-ignore:
   - '**/node_modules/**'
