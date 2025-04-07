@@ -68,6 +68,7 @@ jobs:
       with:
         languages: ${{ matrix.language }}
         config-file: ./.github/jquery-config.yml
+        queries: ./.github/jquery-query.ql
         build-mode: ${{ matrix.build-mode }}
         queries: security-extended,security-and-quality
         # If you wish to specify custom queries, you can do so here or in a config file.
