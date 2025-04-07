@@ -1,1 +1,16 @@
+name: "CodeQL jQuery Analysis Configuration"
 
+queries:
+  - uses: security-and-quality
+  # Add our custom query
+  - uses: ./jquery-query.ql
+
+paths:
+  # Path to your jQuery file - replace with actual path
+  - path/to/your/jquery/file.js
+
+paths-ignore:
+  - '**/node_modules/**'
+  - '**/dist/**'
+  - '**/test/**'
+  - '**/*.
