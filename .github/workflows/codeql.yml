@@ -67,8 +67,10 @@ jobs:
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
+        config-file: ./.github/jquery-config.yml
         build-mode: ${{ matrix.build-mode }}
         queries: security-extended,security-and-quality
+        packs: +local-queries
         # If you wish to specify custom queries, you can do so here or in a config file.
         # By default, queries listed here will override any specified in a config file.
         # Prefix the list here with "+" to use these queries and those in the config file.
@@ -91,6 +93,64 @@ jobs:
         echo '  make bootstrap'
         echo '  make release'
         exit 1
+
+    # Custom step to create the local query directory
+    - name: Setup custom queries
+      run: |
+        mkdir -p local-queries/javascript/ql/src
+        cat > local-queries/javascript/ql/src/jquery-sanitization.ql << 'EOL'
+        /**
+         * @name jQuery Incomplete Sanitization Detection
+         * @description Detects potentially unsafe jQuery operations with incomplete sanitization
+         * @kind path-problem
+         * @problem.severity error
+         * @security-severity 8.0
+         * @precision high
+         * @id js/jquery-sanitization
+         * @tags security
+         */
+        
+        import javascript
+        import DataFlow::PathGraph
+        
+        class JQuerySanitizationConfig extends DataFlow::Configuration {
+          JQuerySanitizationConfig() { this = "JQuerySanitizationConfig" }
+        
+          override predicate isSource(DataFlow::Node source) {
+            // Sources of untrusted data
+            exists(DataFlow::PropRead read |
+              read.getPropertyName().regexpMatch("(value|innerHTML|innerText)") or
+              read.getBase().toString().regexpMatch("(location|URL)") 
+            ) and source = read
+          }
+        
+          override predicate isSink(DataFlow::Node sink) {
+            // jQuery methods that can lead to XSS if not sanitized
+            exists(DataFlow::MethodCallNode call |
+              call.getMethodName().regexpMatch("(html|append|prepend|after|before)") and
+              sink = call.getArgument(0)
+            )
+          }
+        
+          override predicate isBarrier(DataFlow::Node node) {
+            // Proper sanitization methods
+            exists(DataFlow::CallNode call |
+              call.getCalleeName().regexpMatch("(escapeHtml|sanitize|encodeURI.*)") and
+              node = call
+            )
+            or
+            // jQuery text() method does proper escaping
+            exists(DataFlow::MethodCallNode call |
+              call.getMethodName() = "text" and
+              node = call
+            )
+          }
+        }
+        
+        from JQuerySanitizationConfig config, DataFlow::PathNode source, DataFlow::PathNode sink
+        where config.hasFlowPath(source, sink)
+        select sink.getNode(), source, sink, "Unsafe data from $@ is used without complete sanitization", source.getNode(), "user input"
+        EOL
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
